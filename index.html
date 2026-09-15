@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quét Mã QR Điểm Danh - CLB Múa</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Thư viện quét QR qua camera điện thoại -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 pb-12">
+
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-rose-500 to-amber-500 text-white shadow-md sticky top-0 z-50">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <span class="text-2xl">🩰</span>
+        <div>
+          <h1 class="text-base font-bold leading-tight">CLB MÚA TRẦN QUANG DIỆU</h1>
+          <p class="text-[10px] text-rose-100 uppercase tracking-widest font-medium">Hệ thống quét QR tự động</p>
+        </div>
+      </div>
+      <div class="flex bg-white/20 p-1 rounded-xl text-xs font-semibold">
+        <button id="btnTabScanner" onclick="switchTab('scanner')" class="px-3 py-1.5 rounded-lg bg-white text-rose-600 shadow">
+          <i class="fa-solid fa-qrcode mr-1"></i> Quét QR
+        </button>
+        <button id="btnTabList" onclick="switchTab('list')" class="px-3 py-1.5 rounded-lg text-white hover:bg-white/10">
+          <i class="fa-solid fa-users mr-1"></i> Danh sách HS & Mã QR
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 py-6">
+    
+    <!-- TAB 1: MÀN HÌNH QUÉT MÃ QR -->
+    <section id="tabScannerSec" class="space-y-4">
+      
+      <!-- Khung Camera Quét -->
+      <div class="bg-white rounded-2xl shadow-sm border border-rose-100 p-4 text-center">
+        <h2 class="text-base font-bold text-gray-800 mb-2 flex items-center justify-center gap-2">
+          <i class="fa-solid fa-camera text-rose-500"></i> Camera Quét Mã Học Sinh
+        </h2>
+        <p class="text-xs text-gray-500 mb-4">Đưa mã QR của học sinh vào khung vuông camera</p>
+        
+        <div class="relative max-w-sm mx-auto overflow-hidden rounded-2xl border-2 border-dashed border-rose-300 bg-black/5">
+          <div id="qr-reader" class="w-full"></div>
+        </div>
+
+        <!-- Trạng thái thông báo sau khi quét -->
+        <div id="scanStatus" class="mt-4 p-3 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium transition">
+          <i class="fa-solid fa-circle-notch fa-spin text-rose-500 mr-1.5"></i> Đang sẵn sàng nhận mã...
+        </div>
+      </div>
+
+      <!-- Lịch sử các em vừa quét trong buổi -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="text-sm font-bold text-gray-800">
+            <i class="fa-solid fa-clock-rotate-left text-emerald-500 mr-1"></i> Vừa điểm danh thành công (<span id="scanCount">0</span>)
+          </h3>
+          <span class="text-[11px] text-gray-400" id="currentDateStr"></span>
+        </div>
+        <div class="overflow-y-auto max-h-60">
+          <ul id="recentList" class="space-y-2 text-sm">
+            <li class="text-center text-gray-400 py-4 text-xs">Chưa có lượt quét nào trong buổi này.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: DANH SÁCH & XUẤT MÃ QR ĐỂ IN THẺ -->
+    <section id="tabListSec" class="hidden space-y-4">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-sm font-bold text-gray-800">Thẻ Mã QR Của Học Sinh</h3>
+          <p class="text-xs text-gray-500">Dùng để in hoặc chụp ảnh gửi cho phụ huynh</p>
+        </div>
+        <div id="qrCardsContainer" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <!-- Danh sách thẻ QR sẽ được render ở đây -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // Dán link Web App Google Apps Script của bạn vào đây:
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKNXOFKV9JyegwBK-HokV7pkcI3sGEouEkWdRSbqceBcl-EoeheHmpbM_uPWfMGz0G/exec";
+
+    let studentData = [];
+    let scannedIds = new Set();
+    let isProcessing = false;
+    let html5QrCode;
+
+    // Âm thanh Beep khi quét trúng
+    function playBeep() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(800, audioCtx.currentTime); // Tần số 800Hz
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.15); // Kêu trong 0.15s
+      } catch(e){}
+    }
+
+    // Khởi tạo Camera QR Scanner
+    function initScanner() {
+      html5QrCode = new Html5Qrcode("qr-reader");
+      const config = { fps: 15, qrbox: { width: 220, height: 220 } };
+
+      html5QrCode.start(
+        { facingMode: "environment" }, // Dùng camera sau trên điện thoại
+        config,
+        onScanSuccess
+      ).catch(err => {
+        document.getElementById("scanStatus").innerHTML = `<span class="text-red-500">❌ Không thể mở camera. Vui lòng cấp quyền truy cập camera trên trình duyệt!</span>`;
+      });
+    }
+
+    // Khi quét thành công 1 mã
+    async function onScanSuccess(decodedText) {
+      if (isProcessing) return;
+      const rawCode = decodedText.trim();
+
+      // Kiểm tra học sinh trong danh sách
+      const student = studentData.find(s => s.id.toLowerCase() === rawCode.toLowerCase());
+
+      if (!student) {
+        setStatus(`⚠️ Không tìm thấy học sinh có mã: <b>${rawCode}</b>`, "yellow");
+        return;
+      }
+
+      if (scannedIds.has(student.id)) {
+        setStatus(`ℹ️ Em <b>${student.name}</b> (${student.id}) đã được điểm danh trước đó rồi!`, "blue");
+        return;
+      }
+
+      // Xử lý gửi lên Sheet
+      isProcessing = true;
+      playBeep();
+      setStatus(`⏳ Đang lưu <b>${student.name}</b> lên hệ thống...`, "rose");
+
+      try {
+        if (SCRIPT_URL !== "YOUR_GOOGLE_APPS_SCRIPT_URL_HERE") {
+          await fetch(SCRIPT_URL, {
+            method: "POST",
+            body: JSON.stringify({
+              action: "scanAttendance",
+              id: student.id,
+              name: student.name,
+              class: student.class,
+              status: "Có mặt",
+              note: "Quét Camera"
+            })
+          });
+        }
+
+        scannedIds.add(student.id);
+        setStatus(`✅ Điểm danh thành công: <b>${student.name}</b> - Lớp ${student.class}`, "green");
+        addRecentItem(student);
+      } catch (e) {
+        setStatus(`❌ Lỗi kết nối khi gửi dữ liệu!`, "red");
+      } finally {
+        // Tạm dừng 1.5s rồi mới cho quét mã tiếp theo để tránh quét liên tục 1 mã
+        setTimeout(() => { isProcessing = false; }, 1500);
+      }
+    }
+
+    function setStatus(html, type) {
+      const el = document.getElementById("scanStatus");
+      const colors = {
+        green: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+        yellow: "bg-amber-50 text-amber-700 border border-amber-200",
+        blue: "bg-blue-50 text-blue-700 border border-blue-200",
+        rose: "bg-rose-50 text-rose-700 border border-rose-200",
+        red: "bg-red-50 text-red-700 border border-red-200"
+      };
+      el.className = `mt-4 p-3 rounded-xl text-sm font-medium transition ${colors[type] || colors.blue}`;
+      el.innerHTML = html;
+    }
+
+    function addRecentItem(s) {
+      const list = document.getElementById("recentList");
+      if (scannedIds.size === 1) list.innerHTML = "";
+      
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+
+      const item = document.createElement("li");
+      item.className = "flex justify-between items-center p-2.5 bg-emerald-50/60 border border-emerald-100 rounded-xl";
+      item.innerHTML = `
+        <div>
+          <div class="font-bold text-gray-900">${s.name} <span class="text-xs text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded ml-1">${s.class}</span></div>
+          <div class="text-xs text-gray-400">Mã: ${s.id}</div>
+        </div>
+        <span class="text-xs font-semibold text-emerald-600 bg-white px-2 py-1 rounded-lg border shadow-xs">${timeStr}</span>
+      `;
+      list.prepend(item);
+      document.getElementById("scanCount").innerText = scannedIds.size;
+    }
+
+    // Tải dữ liệu học sinh & Tạo mã QR
+    async function fetchStudents() {
+      try {
+        if (SCRIPT_URL === "YOUR_GOOGLE_APPS_SCRIPT_URL_HERE") {
+          // Dữ liệu mẫu demo
+          studentData = [
+            { id: "HS01", name: "Nguyễn Mai Linh", class: "3A" },
+            { id: "HS02", name: "Trần Bảo Ngọc", class: "3B" },
+            { id: "HS03", name: "Lê Hoàng Yến", class: "4A" }
+          ];
+        } else {
+          const res = await fetch(`${SCRIPT_URL}?action=getStudents`);
+          studentData = await res.json();
+        }
+        renderQRCards();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Render danh sách mã QR để giáo viên chụp màn hình hoặc in ấn
+    function renderQRCards() {
+      const container = document.getElementById("qrCardsContainer");
+      container.innerHTML = studentData.map(s => `
+        <div class="border border-slate-200 rounded-xl p-3 flex flex-col items-center text-center bg-white shadow-xs">
+          <!-- Dùng Google Chart API để tự tạo ảnh QR theo Mã HS -->
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(s.id)}" alt="QR" class="w-24 h-24 mb-2 rounded-lg border p-1">
+          <div class="text-xs font-bold text-gray-800 line-clamp-1">${s.name}</div>
+          <div class="text-[11px] text-rose-600 font-semibold">Lớp: ${s.class} | Mã: ${s.id}</div>
+        </div>
+      `).join("");
+    }
+
+    function switchTab(tab) {
+      if (tab === 'scanner') {
+        document.getElementById("tabScannerSec").classList.remove("hidden");
+        document.getElementById("tabListSec").classList.add("hidden");
+        document.getElementById("btnTabScanner").className = "px-3 py-1.5 rounded-lg bg-white text-rose-600 shadow";
+        document.getElementById("btnTabList").className = "px-3 py-1.5 rounded-lg text-white hover:bg-white/10";
+      } else {
+        document.getElementById("tabListSec").classList.remove("hidden");
+        document.getElementById("tabScannerSec").classList.add("hidden");
+        document.getElementById("btnTabList").className = "px-3 py-1.5 rounded-lg bg-white text-rose-600 shadow";
+        document.getElementById("btnTabScanner").className = "px-3 py-1.5 rounded-lg text-white hover:bg-white/10";
+      }
+    }
+
+    // Khởi động khi tải xong trang
+    window.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("currentDateStr").innerText = new Date().toLocaleDateString('vi-VN');
+      fetchStudents();
+      initScanner();
+    });
+  </script>
+</body>
+</html>
