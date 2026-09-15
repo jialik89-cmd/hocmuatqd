@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Quét Mã QR Điểm Danh - CLB Múa</title>
+  <title>CLB Múa Trần Quang Diệu - Điểm Danh QR</title>
+  <link rel="icon" type="image/png" href="logo.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- Thư viện giải mã QR siêu nhẹ & nhạy -->
@@ -13,22 +14,23 @@
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 pb-12">
 
-  <!-- Header -->
-  <header class="bg-gradient-to-r from-rose-500 to-amber-500 text-white shadow-md sticky top-0 z-50">
-    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-2.5">
-        <span class="text-2xl">🩰</span>
+  <!-- Header có Logo sắc nét -->
+  <header class="bg-gradient-to-r from-rose-500 via-rose-600 to-amber-500 text-white shadow-md sticky top-0 z-50">
+    <div class="max-w-4xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-3">
+        <!-- Logo CLB Múa -->
+        <img src="logo.png" alt="Logo CLB Múa" class="w-12 h-12 rounded-full border-2 border-amber-300 shadow-md object-cover bg-white shrink-0">
         <div>
-          <h1 class="text-base font-bold leading-tight">CLB MÚA TRẦN QUANG DIỆU</h1>
-          <p class="text-[10px] text-rose-100 uppercase tracking-widest font-medium">Hệ thống quét QR tự động</p>
+          <h1 class="text-sm sm:text-base font-extrabold tracking-tight leading-tight uppercase">CLB MÚA TRẦN QUANG DIỆU</h1>
+          <p class="text-[10px] text-amber-200 uppercase tracking-widest font-semibold">Hệ thống quét QR tự động</p>
         </div>
       </div>
-      <div class="flex bg-white/20 p-1 rounded-xl text-xs font-semibold">
+      <div class="flex bg-black/15 p-1 rounded-xl text-xs font-semibold shrink-0">
         <button id="btnTabScanner" onclick="switchTab('scanner')" class="px-3 py-1.5 rounded-lg bg-white text-rose-600 shadow">
           <i class="fa-solid fa-qrcode mr-1"></i> Quét QR
         </button>
         <button id="btnTabList" onclick="switchTab('list')" class="px-3 py-1.5 rounded-lg text-white hover:bg-white/10">
-          <i class="fa-solid fa-users mr-1"></i> Danh sách HS & QR
+          <i class="fa-solid fa-users mr-1"></i> Danh sách HS
         </button>
       </div>
     </div>
@@ -62,7 +64,7 @@
         </div>
 
         <!-- Trạng thái thông báo -->
-        <div id="scanStatus" class="mt-4 p-3 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium transition min-h-[50px] flex items-center justify-center">
+        <div id="scanStatus" class="mt-4 p-3 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium transition min-h-[50px] flex items-center justify-center text-center">
           <span><i class="fa-solid fa-circle-info text-rose-500 mr-1.5"></i> Bấm "Bật Camera Quét Mã" để bắt đầu...</span>
         </div>
       </div>
@@ -112,7 +114,7 @@
   </main>
 
   <script>
-    // Link Google Apps Script của bạn
+    // Link Google Apps Script chính thức của bạn
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKNXOFKV9JyegwBK-HokV7pkcI3sGEouEkWdRSbqceBcl-EoeheHmpbM_uPWfMGz0G/exec";
 
     let studentData = [];
@@ -129,7 +131,6 @@
     const canvas = document.getElementById("qrCanvas");
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
-    // Âm thanh Beep khi điểm danh thành công
     function playBeep() {
       try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -145,7 +146,6 @@
       } catch(e){}
     }
 
-    // Âm thanh Cảnh báo khi quét trùng
     function playWarnBeep() {
       try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -233,13 +233,11 @@
           inversionAttempts: "dontInvert"
         });
 
-        // Nếu bắt được mã và hệ thống không trong trạng thái bận
         if (code && code.data && !isProcessing) {
           handleScannedCode(code.data);
         }
       }
       
-      // Luôn luôn duy trì vòng lặp để camera không bao giờ bị đơ
       animationFrameId = requestAnimationFrame(tick);
     }
 
@@ -247,21 +245,17 @@
       const cleanCode = String(rawCode).trim();
       if (!cleanCode) return;
 
-      // Khóa tạm để xử lý
       isProcessing = true;
 
-      // Tìm thông tin học sinh
       const student = studentData.find(s => String(s.id).trim().toLowerCase() === cleanCode.toLowerCase());
 
       if (!student) {
         playWarnBeep();
         setStatus(`⚠️ Mã <b>${cleanCode}</b> không tồn tại trong danh sách!`, "yellow");
-        // Tự mở lại quét sau 1.5s
         setTimeout(() => { isProcessing = false; }, 1500);
         return;
       }
 
-      // KIỂM TRA TRÙNG LẶP: Nếu đã điểm danh rồi thì CHẶN ngay
       const isAlreadyScanned = scannedRecords.some(r => String(r.id).trim().toLowerCase() === student.id.toLowerCase());
       if (isAlreadyScanned) {
         playWarnBeep();
@@ -270,7 +264,6 @@
         return;
       }
 
-      // Xử lý điểm danh hợp lệ
       playBeep();
       setStatus(`⏳ Đang lưu <b>${student.name}</b> lên Sheet...`, "rose");
 
@@ -285,7 +278,6 @@
       };
 
       try {
-        // Gửi nền ngầm lên Google Apps Script
         fetch(SCRIPT_URL, {
           method: "POST",
           mode: "no-cors",
@@ -300,7 +292,6 @@
           })
         }).catch(err => console.error("Lỗi gửi Sheet:", err));
 
-        // Lưu vào LocalStorage & cập nhật giao diện
         scannedRecords.unshift(record);
         localStorage.setItem(TODAY_KEY, JSON.stringify(scannedRecords));
 
@@ -310,7 +301,6 @@
       } catch (e) {
         setStatus(`❌ Lỗi kết nối hệ thống!`, "red");
       } finally {
-        // Tự động mở lại camera quét người tiếp theo sau 1.2s mà KHÔNG CẦN F5
         setTimeout(() => {
           isProcessing = false;
         }, 1200);
